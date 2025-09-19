@@ -34,6 +34,33 @@ def get_brewery_count(state: str) -> Dict:
     The OpenBrewery DB API URL is of the form "https://api.openbrewerydb.org/v1/breweries?by_state={state}&per_page=200&page={page}"
     keep incrementing the page number until the response json == [] or status_code != 200
     """
+    page = 1
+    per_page = 200  # Maximum allowed by the API
+    
+    while True:
+        url = f"https://api.openbrewerydb.org/v1/breweries?by_state={state}&per_page={per_page}&page={page}"
+        response = req.get(url)
+        
+        # Check if request was successful
+        if response.status_code != 200:
+            break
+        
+        # Parse the JSON response
+        breweries = response.json()
+        
+        # If no more breweries, we're done
+        if not breweries:
+            break
+        
+        # Add the count of breweries from this page
+        count += len(breweries)
+        
+        # If we got fewer than per_page breweries, we're on the last page
+        if len(breweries) < per_page:
+            break
+            
+        # Move to the next page
+        page += 1
     
     print(f"get_brewery_count, state={state}, exiting")
     return dict(state=state, brewery_count=count)
@@ -51,6 +78,10 @@ async def async_get_brewery_count(state: str) -> Dict:
     """
     YOUR CODE HERE
     """
+    # Run the synchronous function in an executor to avoid blocking
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, get_brewery_count, state)
+    return result
     
 async def get_brewery_counts_for_states(states: List[str]) -> List[Dict]:
     """
@@ -65,6 +96,13 @@ async def get_brewery_counts_for_states(states: List[str]) -> List[Dict]:
     """
     YOUR CODE HERE
     """
+    # Create a list of async tasks for all states
+    tasks = [async_get_brewery_count(state) for state in states]
+    
+    # Execute all tasks concurrently using gather
+    results = await asyncio.gather(*tasks)
+    
+    return results
 
 if __name__ == "__main__":
     states = ['district_of_columbia', 'maryland', 'new_york', 'virginia']
